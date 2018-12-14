@@ -12,17 +12,17 @@
 */
 
 #include <Ultrasonic.h>
-Ultrasonic FrontUltrasonic(10, 11);    // (Trigger , Echo)
-Ultrasonic BackUltrasonic(A2, A3);    // (Trigger , Echo)
+Ultrasonic FrontUltrasonic(9, 8);    // (Trigger , Echo)
+Ultrasonic BackUltrasonic(A2, A1);    // (Trigger , Echo)
 
-int distance=100, backDis, frontDis;
-int fspeed = 120 , mxspeed = 200 ,curveSpeed = 90;
+int distance=30, backDis, frontDis;
+int rightspeed = 240 ,leftspeed=210 , mxspeed = 255 ,curveRightSpeed = 130 , curveLeftSpeed = 190;
 
-const byte rIN1 = 13 , rIN2 = 12 , rEN = A1;   // Right Motor
-const byte lIN1 = 9 , lIN2 = 8 , lEN = A0 ;    // Left Motor
-const byte FrontRightIR = 2 , FrontLeftIR = 4 , FrontMiddleIR = 3 ;     // Front IR sensors 
-const byte BackLeftIR = 5 , BackRightIR = 7 , BackMiddleIR = 6;         // Back IR sensors
-byte Frontright, Frontleft, Frontmiddle, Backleft, Backright, Backmiddle;
+const byte rIN1 = 13 , rIN2 = 12 , rEN = 5;   // Right Motor
+const byte lIN1 = 10, lIN2 = 11 , lEN = 6 ;    // Left Motor
+const byte FrontRightIR = A3 , FrontLeftIR = A5  ;     // Front IR sensors 
+const byte BackLeftIR = 2 , BackRightIR = 4 ;         // Back IR sensors
+byte Frontright, Frontleft, Backleft, Backright;
 
 void setup() {
   
@@ -34,17 +34,15 @@ void setup() {
   pinMode(lEN , OUTPUT);
   pinMode(FrontRightIR  , INPUT);
   pinMode(FrontLeftIR   , INPUT);
-  pinMode(FrontMiddleIR , INPUT);
   pinMode(BackLeftIR    , INPUT);
   pinMode(BackRightIR   , INPUT);
-  pinMode(BackMiddleIR  , INPUT);
-
+  Serial.begin(9600);
 }
 
 void ScanArea();
 void AttackTarget(char c);
 void Avoid();
-void MoveForward(int s);
+void MoveForward(int sr , int sl);
 void TurnRight();
 void TurnLeft();
 void MoveBackward(int s);
@@ -57,42 +55,54 @@ void loop() {
   // each loop gets new IR readings to ensure avoiding obstacles 
     Frontright=digitalRead(FrontRightIR);
     Frontleft=digitalRead(FrontLeftIR);
-    Frontmiddle=digitalRead(FrontMiddleIR);
   
     Backleft=digitalRead(BackLeftIR);
     Backright=digitalRead(BackRightIR);
-    Backmiddle=digitalRead(BackMiddleIR);
 
     // no IR is active & we're away from the borders
-    if (Frontright==LOW &&Frontleft==LOW && Frontmiddle==LOW &&Backleft==LOW && Backright == LOW && Backmiddle == LOW ){
+    if (Frontright==LOW && Frontleft==LOW  && Backleft==LOW && Backright == LOW ){
+      Serial.println("Scanning");
       ScanArea();
     }
     else { // maybe close to an edge.
+      Serial.println("Avoiding");
       Avoid();
+   
     }
+/*
+MoveForward(255 , 255);
+delay(2000);
+MoveBackward(255 , 255);
+delay(2000);
+TurnRight();
+delay(1000);
+TurnLeft();
+delay(1000);
 
-
+*/
 }
 
-void MoveForward (int s){
+void MoveForward (int rs , int ls){
   
   digitalWrite(rIN1  , 0);
   digitalWrite(rIN2  , HIGH);
-  analogWrite (rEN , s);
+  analogWrite (rEN , rs);
   digitalWrite(lIN1  , 0);
   digitalWrite(lIN2  , HIGH);
-  analogWrite(lEN , s);
+  analogWrite(lEN , ls);
+  Serial.println("Moving Forward");
   
   }
 
-  void MoveBackward(int s){
+  void MoveBackward(int rs , int ls){
     
   digitalWrite(rIN1  , HIGH);
   digitalWrite(rIN2  , 0);
-  analogWrite (rEN , s);
+  analogWrite (rEN , rs);
   digitalWrite(lIN1  , HIGH);
   digitalWrite(lIN2  , 0);
-  analogWrite(lEN , s);
+  analogWrite(lEN , ls);
+  Serial.println("Moving backward");
   
   }
  void Stop () {
@@ -102,22 +112,25 @@ void MoveForward (int s){
   digitalWrite(lIN1  , 0);
   digitalWrite(lIN2  , 0);
   analogWrite(lEN , 0);
+  Serial.println("Stopped");
   }
 void  TurnRight () {
-  digitalWrite(rIN1  , 0);
+  digitalWrite(rIN1  , HIGH);
   digitalWrite(rIN2  , 0);
-  analogWrite (rEN , 0);
+  analogWrite (rEN , curveLeftSpeed);
   digitalWrite(lIN1  , 0);
   digitalWrite(lIN2  , HIGH);
-  analogWrite(lEN , curveSpeed);
+  analogWrite(lEN , curveRightSpeed);
+  Serial.println("Right Turn");
     }
 void  TurnLeft () {
   digitalWrite(rIN1  , 0);
   digitalWrite(rIN2  , HIGH);
-  analogWrite (rEN , curveSpeed);
-  digitalWrite(lIN1  , 0);
+  analogWrite (rEN , curveLeftSpeed);
+  digitalWrite(lIN1  , HIGH);
   digitalWrite(lIN2  , 0);
-  analogWrite(lEN , 0);
+  analogWrite(lEN , curveRightSpeed);
+  Serial.println("Left Turn");
   }
   
 void ScanArea() {
@@ -128,19 +141,22 @@ void ScanArea() {
   backDis = BackUltrasonic.read();
  
  
- if (backDis >= distance && frontDis < distance) // Enemy ahead
+ if ( frontDis <= distance) // Enemy ahead
   {
    
     AttackTarget('f');
+      Serial.println("Attacking Enemy in front");
   }
-  else if ( backDis < distance && frontDis >= distance ){  //Enemy is behind.
+  else if ( backDis <= distance  ){  //Enemy is behind.
     AttackTarget('b');
+      Serial.println("Attacking enemy behind");
   }
   else  // Nothing found so keep searching
   {
-    MoveForward(fspeed); // moveForward to avoid remaining in the same place.
-    delay (500); // keep moving for 0.5 s
-    while (ttl < 18 && FrontUltrasonic.read() > distance && BackUltrasonic.read() > distance ) { // make turns while searching
+      Serial.println("Nothing found will keep searching");
+    MoveForward(rightspeed , leftspeed); // moveForward to avoid remaining in the same place.
+    delay (1000); // keep moving for 1 s
+    while (ttl <= 20 && FrontUltrasonic.read() > distance && BackUltrasonic.read() > distance ) { // make turns while searching
       ttl ++;
       makeAngle ();
      
@@ -149,72 +165,52 @@ void ScanArea() {
   }
 }
 void makeAngle () {
-      
+ Serial.println("Making angle NOW");
  TurnRight (); // right or left is the same
- delay (50); // to be changed by try and error to make a small angle approx = 10 degrees
+ delay (500); // to be changed by try and error to make an angle approx = 30 degrees
  Stop(); // to give the sonics some space to capture readings.
  
   }
 
 void AttackTarget(char c) {
+  Serial.println("Attacking");
   if (c=='f'){ // argument passed by the search function
     if (FrontUltrasonic.read() <= distance / 2){ // IF the enemy is close we need to move fast to gain some tork.
-        MoveForward (mxspeed);
+        MoveForward (rightspeed+30 , leftspeed+30);
       }
       else { // other wise we need to move on avg speed to make sure we don't run out of the borders.
-        MoveForward(fspeed);
+        MoveForward(rightspeed , leftspeed);
       }
   }else {
     if (BackUltrasonic.read() <= distance / 2){
-      MoveBackward (mxspeed);
+      MoveBackward (rightspeed+30 , leftspeed+30);
     }
     else 
     {
-      MoveBackward(fspeed);
+      MoveBackward(rightspeed , leftspeed);
     }
   }
   
-
 } 
 void Avoid(){
   // Get reading from all IRS.
     Frontright=digitalRead(FrontRightIR);
     Frontleft=digitalRead(FrontLeftIR);
-    Frontmiddle=digitalRead(FrontMiddleIR);
   
     Backleft=digitalRead(BackLeftIR);
     Backright=digitalRead(BackRightIR);
-    Backmiddle=digitalRead(BackMiddleIR);
 
-    if ((Frontright==HIGH && Frontleft==LOW && Frontmiddle==LOW) || (Backleft==LOW && Backright==HIGH && Backmiddle==LOW) ){
+    if ((Frontright==HIGH && Frontleft==LOW ) || (Backleft==LOW && Backright==HIGH ) ){
         TurnLeft();
     }
-    
-    else if (( Frontright==LOW && Frontleft==LOW && Frontmiddle==HIGH) || (Backleft==LOW && Backright==LOW && Backmiddle==HIGH ) ){
-        TurnRight(); // Or Left
-    }
-    else if( (Frontright==HIGH && Frontleft==LOW && Frontmiddle==HIGH) || (Backleft==LOW && Backright==HIGH && Backmiddle==HIGH) ){
-        TurnLeft();
-    }
-    else if( (Frontright==LOW && Frontleft==HIGH && Frontmiddle==LOW) || (Backleft==HIGH && Backright==LOW && Backmiddle==LOW) ){
+    else if( (Frontright==LOW && Frontleft==HIGH ) || (Backleft==HIGH && Backright==LOW ) ){
         TurnRight();
+    }  
+    else if(Frontright==HIGH && Frontleft==HIGH ){
+        MoveBackward(rightspeed , leftspeed);
     }
-    else if( (Frontright==LOW && Frontleft==HIGH && Frontmiddle==HIGH) || (Backleft==HIGH && Backright==LOW && Backmiddle==HIGH) ){
-        TurnRight();
+    else if(Backleft==HIGH && Backright==HIGH ) {
+        MoveForward(rightspeed , leftspeed);
     }
-    
-    else if(Frontright==HIGH && Frontleft==HIGH && Frontmiddle==LOW){
-        MoveBackward(fspeed);
-    }
-    else if(Backleft==HIGH && Backright==HIGH && Backmiddle==LOW) {
-        MoveForward(fspeed);
-    }
-    else if(Frontright==HIGH && Frontleft==HIGH && Frontmiddle==HIGH){
-        MoveBackward(fspeed);
-    }
-    else if(Backleft==HIGH && Backright==HIGH && Backmiddle==HIGH) {
-        MoveForward(fspeed);
-    }
+   
 } 
-
-
